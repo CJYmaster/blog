@@ -84,6 +84,7 @@ draft: false
 
 ```
 .
+├── .github/workflows/deploy.yml   # 推送到 main 自动发布到 GitHub Pages
 ├── build.mjs            # 构建脚本：读 Markdown → 写 dist/
 ├── serve.mjs            # 本地预览服务器（含 --watch 热重建）
 ├── site.config.mjs      # ★ 站点配置：站名、简介、导航、域名
@@ -168,11 +169,49 @@ export default {
 npm run build     # 然后把 dist/ 整个目录传上去
 ```
 
-- **GitHub Pages**：把 `dist/` 推到 `gh-pages` 分支
 - **Vercel / Netlify**：构建命令 `node build.mjs`，发布目录 `dist`
 - **自己的服务器**：`dist/` 丢进 Nginx 目录，指向 `index.html`，404 页面设为 `404.html`
+- **GitHub Pages**：见下一节
 
 记得把 `site.config.mjs` 里的 `siteUrl` 换成真实域名，否则 RSS 里的链接是 `example.com`。
+
+### GitHub Pages（已配好自动部署）
+
+仓库里已经带了 `.github/workflows/deploy.yml`：**推送到 `main` 就会自动构建并发布**，本机不用手动构建，`dist/` 也不需要进仓库。
+
+首次配置只要三步：
+
+1. 在 GitHub 上建一个**公开**仓库（免费账户只有公开仓库能发布 Pages），把本地代码推上去：
+
+   ```bash
+   git init
+   git add .
+   git commit -m "初始化博客"
+   git branch -M main
+   git remote add origin https://github.com/你的用户名/仓库名.git
+   git push -u origin main
+   ```
+
+2. 仓库 **Settings → Pages → Build and deployment → Source** 选择 **GitHub Actions**。
+   ⚠️ 这一步最关键：留在默认的 `Deploy from a branch`，GitHub 会拿仓库根目录当 Jekyll 站点构建，结果是空白页或 404。
+
+3. 改 `site.config.mjs` 里的 `siteUrl` 为最终地址，再 push 一次：
+
+   ```js
+   siteUrl: 'https://你的用户名.github.io/仓库名',
+   ```
+
+之后每次写笔记只需：
+
+```bash
+git add . && git commit -m "新笔记：xxx" && git push
+```
+
+约一分钟后在 **Actions** 标签页看到绿勾，站点即更新。构建失败时点进那次运行看日志，最常见的原因是 Markdown 头部的 YAML 写坏了（比如 `tags: [a, b` 少了 `]`）。
+
+> 构建脚本会顺手在 `dist/` 里生成一个空的 `.nojekyll`。GitHub Pages 默认用 Jekyll 处理站点，遇到以 `_` 开头的文件或目录会拒绝上传；有了这个文件就关掉了限制，以后你放 `_cover.jpg` 这类资源也不会出问题。
+
+> 站点地址形如 `用户名.github.io/仓库名/`，多了一层子路径。本项目所有链接都是相对路径，所以无需任何改动即可正常工作；但如果之后绑定了自定义域名（站点搬到根目录），记得同步修改 `siteUrl`，去掉仓库名那一段。
 
 ## 一点设计说明
 

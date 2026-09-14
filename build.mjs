@@ -343,6 +343,10 @@ export async function build() {
     await copyFile(path.join(ASSETS_DIR, asset.name), path.join(OUT_DIR, 'assets', asset.name));
   }
 
+  // GitHub Pages 默认会拿 Jekyll 处理站点，遇到以 _ 开头的文件或目录会直接拒绝上传。
+  // 放一个空的 .nojekyll 就能关掉 Jekyll，让 _ 开头的资源也能正常发布。
+  await writeOut('.nojekyll', '');
+
   const ms = Date.now() - started;
   console.log(
     `\n  ${site.title} 构建完成 → dist/  (${posts.length} 篇文章 · ${months.length} 个月 · ${tagCloud.length} 个标签 · ${ms}ms)\n`,

@@ -9,7 +9,7 @@ export default {
   author: '你的名字',
 
   // 部署后的域名（生成 RSS 时需要绝对地址）。本地预览随便填。
-  siteUrl: 'https://example.com',
+  siteUrl: 'https://CJYmaster.github.io/blog',
 
   // 首页顶部的一句话
   hero: {
