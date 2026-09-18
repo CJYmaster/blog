@@ -1,13 +1,20 @@
-/* 苔痕集 · 交互脚本
+/* 凝痕 · 交互脚本
    全部功能都是渐进增强：脚本不跑，页面照样能读。 */
 (function () {
   'use strict';
 
-  /* ---------- 首页：搜索 + 按月筛选 ---------- */
+  /* ---------- 文章列表：搜索 + 月份筛选 + 小分类筛选 ---------- */
+  /*
+     首页和模块页共用这段逻辑：
+       - 首页的 chips 是「月份」（data-month）
+       - 模块页的 chips 是「小分类」（data-sub），单选，另有「全部」
+     两种筛选可以叠加，再叠加搜索关键词。
+  */
 
   function initFilter() {
     const input = document.getElementById('search-input');
-    const chips = document.getElementById('month-chips');
+    const monthChips = document.getElementById('month-chips');
+    const subChips = document.getElementById('sub-chips');
     const list = document.querySelector('.post-list');
     const empty = document.getElementById('empty-state');
     const hint = document.getElementById('result-hint');
@@ -26,6 +33,7 @@
     if (!groups.length) return;
 
     let activeMonth = '';
+    let activeSub = '';
 
     function apply() {
       const q = input.value.trim().toLowerCase();
@@ -35,7 +43,8 @@
         const monthHit = !activeMonth || group.key === activeMonth;
         let visibleInGroup = 0;
         for (const card of group.cards) {
-          const hit = monthHit && (!q || card.textContent.toLowerCase().includes(q));
+          const subHit = !activeSub || card.dataset.sub === activeSub;
+          const hit = monthHit && subHit && (!q || card.textContent.toLowerCase().includes(q));
           card.hidden = !hit;
           if (hit) visibleInGroup++;
         }
@@ -46,32 +55,49 @@
 
       if (empty) empty.hidden = shown !== 0;
 
-      const label = groups.find((g) => g.key === activeMonth)?.label || activeMonth;
+      const parts = [];
+      if (activeSub) parts.push(activeSub);
+      if (activeMonth) parts.push(groups.find((g) => g.key === activeMonth)?.label || activeMonth);
+
       if (hint) {
-        const filtering = Boolean(q || activeMonth);
+        const filtering = Boolean(q || activeMonth || activeSub);
         hint.hidden = !filtering;
-        if (filtering) hint.textContent = `筛选出 ${shown} 篇${activeMonth ? ` · ${label}` : ''}`;
+        if (filtering) hint.textContent = `筛选出 ${shown} 篇${parts.length ? ` · ${parts.join(' · ')}` : ''}`;
       }
 
       // 正在按月看时给出提示，并把「更早的文章」折叠掉
       if (bar && barLabel) {
         bar.hidden = !activeMonth;
-        if (activeMonth) barLabel.textContent = label;
+        if (activeMonth) barLabel.textContent = groups.find((g) => g.key === activeMonth)?.label || activeMonth;
       }
-      if (olderLink) olderLink.hidden = Boolean(activeMonth);
+      if (olderLink) olderLink.hidden = Boolean(activeMonth || activeSub || q);
     }
 
-    input.addEventListener('input', apply);
-
-    if (chips) {
+    // 绑定一组 chips：datasetKey 是 data-month 或 data-sub
+    function bindChips(chips, datasetKey, onChange) {
+      if (!chips) return;
       chips.addEventListener('click', (event) => {
         const chip = event.target.closest('.chip');
         if (!chip) return;
         chips.querySelectorAll('.chip').forEach((el) => el.classList.toggle('is-active', el === chip));
-        activeMonth = chip.dataset.month || '';
+        onChange(chip.dataset[datasetKey] || '');
         apply();
       });
     }
+
+    // 小分类默认可能是「全部」，也可能是 URL 里带的 ?sub=xxx
+    const preset = new URLSearchParams(location.search).get('sub');
+    if (preset && subChips) {
+      const target = subChips.querySelector(`.chip[data-sub="${CSS.escape(preset)}"]`);
+      if (target) {
+        subChips.querySelectorAll('.chip').forEach((el) => el.classList.toggle('is-active', el === target));
+        activeSub = preset;
+      }
+    }
+
+    input.addEventListener('input', apply);
+    bindChips(monthChips, 'month', (v) => (activeMonth = v));
+    bindChips(subChips, 'sub', (v) => (activeSub = v));
 
     // 按 / 直接跳到搜索框
     document.addEventListener('keydown', (event) => {

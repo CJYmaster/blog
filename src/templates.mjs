@@ -38,7 +38,18 @@ function tagsInline(tags, prefix) {
 /* 页面骨架                                                            */
 /* ------------------------------------------------------------------ */
 
-export function layout({ site, prefix = '', pageKey = '', title, description, content, bodyClass = '', extraHead = '' }) {
+export function layout({
+  site,
+  prefix = '',
+  pageKey = '',
+  title,
+  description,
+  content,
+  bodyClass = '',
+  extraHead = '',
+  moduleNav = null,
+  activeModule = '',
+}) {
   const pageTitle = title ? `${title} · ${site.title}` : `${site.title} · ${site.tagline}`;
   const desc = description || site.description;
   const thisYear = new Date().getFullYear();
@@ -50,6 +61,9 @@ export function layout({ site, prefix = '', pageKey = '', title, description, co
       return `<a href="${prefix}${item.href}"${active}>${escapeHtml(item.text)}</a>`;
     })
     .join('');
+
+  const sidebar = renderSidebar({ prefix, moduleNav, activeModule });
+  const shellClass = moduleNav?.modules?.length ? 'shell has-sidebar' : 'shell';
 
   return `<!doctype html>
 <html lang="zh-CN">
@@ -75,7 +89,7 @@ export function layout({ site, prefix = '', pageKey = '', title, description, co
 <a class="skip-link" href="#main">跳到正文</a>
 
 <header class="site-header">
-  <div class="wrap header-inner">
+  <div class="wrap-wide header-inner">
     <a class="brand" href="${prefix}index.html" aria-label="${escapeHtml(site.title)} 首页">
       <span class="brand-mark" aria-hidden="true">
         <svg viewBox="0 0 32 32" width="30" height="30">
@@ -93,12 +107,14 @@ export function layout({ site, prefix = '', pageKey = '', title, description, co
   </div>
 </header>
 
-<main class="wrap" id="main">
+<div class="${shellClass}">
+${sidebar}  <main class="wrap" id="main">
 ${content}
-</main>
+  </main>
+</div>
 
 <footer class="site-footer">
-  <div class="wrap footer-inner">
+  <div class="wrap-wide footer-inner">
     <p>© ${copyright} ${escapeHtml(site.author)} · 用 Markdown 写作，用 200 行脚本生成</p>
     <p class="footer-meta"><a href="${prefix}feed.xml">RSS</a>${site.footer.icp ? ` · <span>${escapeHtml(site.footer.icp)}</span>` : ''}</p>
   </div>
@@ -111,12 +127,56 @@ ${content}
 }
 
 /* ------------------------------------------------------------------ */
+/* 左侧栏：内容模块（竖排）                                            */
+/* ------------------------------------------------------------------ */
+
+export function renderSidebar({ prefix = '', moduleNav = null, activeModule = '' }) {
+  const modules = moduleNav?.modules ?? [];
+  if (!modules.length) return '';
+
+  const items = modules
+    .map((m) => {
+      const active = m.key === activeModule ? ' is-active' : '';
+      return `<li><a class="mod-link${active}" href="${prefix}${m.url}"><span class="mod-name">${escapeHtml(m.name)}</span><span class="mod-count">${m.count}</span></a></li>`;
+    })
+    .join('\n      ');
+
+  return `<aside class="sidebar" aria-label="内容模块">
+    <p class="sidebar-title">模块</p>
+    <ul class="mod-list">
+      <li><a class="mod-link${activeModule ? '' : ' is-active'}" href="${prefix}index.html"><span class="mod-name">全部</span><span class="mod-count">${moduleNav.total}</span></a></li>
+      ${items}
+    </ul>
+  </aside>
+`;
+}
+
+/* ------------------------------------------------------------------ */
 /* 组件                                                                */
 /* ------------------------------------------------------------------ */
 
+/** 窄屏用的模块导航（宽屏由左侧栏承担，CSS 会把它隐藏） */
+export function moduleTabs(moduleNav, prefix = '', activeKey = '') {
+  const modules = moduleNav?.modules ?? [];
+  if (!modules.length) return '';
+  const items = [
+    { key: '', name: '全部', url: 'index.html', count: moduleNav.total },
+    ...modules,
+  ];
+  return `<nav class="mod-tabs" aria-label="内容模块">${items
+    .map(
+      (m) =>
+        `<a class="mod-tab${m.key === activeKey ? ' is-active' : ''}" href="${prefix}${m.url}">${escapeHtml(
+          m.name,
+        )}<i>${m.count}</i></a>`,
+    )
+    .join('')}</nav>`;
+}
+
 export function postCard(post, prefix = '') {
   const tags = post.tags?.length ? ` data-tags="${escapeHtml(post.tags.map((t) => t.name).join(','))}"` : ' data-tags=""';
-  return `<article class="post-card"${tags}>
+  const sub = post.sub ? ` data-sub="${escapeHtml(post.sub)}"` : ' data-sub=""';
+  return `<article class="post-card"${tags}${sub}>
   <a class="post-card-main" href="${prefix}${post.url}">
     <time class="post-card-date" datetime="${post.date}">${formatShort(post.date)}</time>
     <div class="post-card-body">
@@ -171,7 +231,7 @@ export function hero({ site }) {
 /* 各个页面                                                            */
 /* ------------------------------------------------------------------ */
 
-export function renderHome({ site, prefix = '', blocks, total, months, newestMonth, olderLink }) {
+export function renderHome({ site, prefix = '', blocks, total, months, newestMonth, olderLink, moduleNav }) {
   const monthChips = months.length
     ? `<div class="chips month-chips" id="month-chips">
     <button class="chip is-active" data-month="">全部</button>
@@ -199,6 +259,7 @@ export function renderHome({ site, prefix = '', blocks, total, months, newestMon
 
   const content = `${hero({ site })}
 <section class="section" id="posts">
+  ${moduleTabs(moduleNav, '')}
   <div class="section-head">
     <h2 class="section-title">最近写下的</h2>
     <span class="section-count">${total} 篇 · ${months.length} 个月</span>
@@ -218,11 +279,12 @@ export function renderHome({ site, prefix = '', blocks, total, months, newestMon
     pageKey: 'home',
     content,
     description: site.description,
+    moduleNav,
     extraHead: `\n<meta name="newest-month" content="${newestMonth}">`,
   });
 }
 
-export function renderPost({ site, prefix = '', post, prev, next }) {
+export function renderPost({ site, prefix = '', post, prev, next, moduleNav }) {
   const toc = post.headings.length
     ? `<aside class="toc" aria-label="目录">
   <p class="toc-title">目录</p>
@@ -266,11 +328,12 @@ ${post.html}
     description: post.summary,
     content,
     bodyClass: 'is-post',
+    moduleNav,
     extraHead: `\n<meta property="og:type" content="article">\n<meta property="article:published_time" content="${post.date}">`,
   });
 }
 
-export function renderArchive({ site, prefix = '', groups, total }) {
+export function renderArchive({ site, prefix = '', groups, total, moduleNav }) {
   const body = groups
     .map(
       (y) => `<section class="archive-year">
@@ -305,11 +368,78 @@ ${y.months
 </header>
 ${body}`;
 
-  return layout({ site, prefix, pageKey: 'archive', title: '归档', content });
+  return layout({ site, prefix, pageKey: 'archive', title: '归档', content, moduleNav });
+}
+
+/**
+ * 模块页：内容模块 → 小分类 → 按月展示
+ *
+ * 小分类 chips 排在月份列表上方：单选某个小分类就只看它，选「全部」则全部展开。
+ * 筛选是纯前端的，chips 也能作为带参数的链接分享。
+ */
+export function renderModule({ site, prefix = '', mod, moduleNav, months }) {
+  const total = mod.posts.length;
+  const blocks = months.map((m) => ({
+    key: m.key,
+    heading: { label: m.label, datetime: m.key, href: null },
+    posts: m.posts,
+  }));
+
+  const subChips = mod.subs.length
+    ? `<div class="chips sub-chips" id="sub-chips">
+    <button class="chip is-active" data-sub="">全部<i>${total}</i></button>
+    ${mod.subs
+      .map((s) => `<button class="chip" data-sub="${escapeHtml(s.name)}">${escapeHtml(s.name)}<i>${s.count}</i></button>`)
+      .join('')}
+  </div>`
+    : '';
+
+  const content = `<header class="page-header">
+  <p class="page-eyebrow">模块</p>
+  <h1 class="page-title">${escapeHtml(mod.name)}</h1>
+  ${mod.desc ? `<p class="page-lead">${escapeHtml(mod.desc)}</p>` : ''}
+  <p class="page-lead page-lead-sub">${total} 篇 · ${months.length} 个月${
+    mod.subs.length ? ` · ${mod.subs.length} 个小分类` : ''
+  }</p>
+</header>
+
+${moduleTabs(moduleNav, prefix, mod.key)}
+
+<section class="section" id="posts">
+  <div class="toolbar">
+    <label class="search">
+      <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
+        <circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.7"/>
+        <path d="M16 16l4.5 4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+      </svg>
+      <input type="search" id="search-input" placeholder="在这个模块里搜索…" autocomplete="off" aria-label="搜索本模块文章">
+      <kbd>/</kbd>
+    </label>
+    ${subChips}
+  </div>
+  <p class="result-hint" id="result-hint" hidden></p>
+  <div class="month-bar" id="month-bar" hidden>正在显示 <strong id="month-bar-label"></strong></div>
+  ${postList(blocks, prefix)}
+  <p class="empty" id="empty-state" hidden>没有找到匹配的文章，换个词试试？</p>
+  <p class="older-link" id="older-link" hidden></p>
+</section>
+
+<p class="page-foot"><a class="back-home" href="${prefix}archive.html">查看全部归档 →</a></p>`;
+
+  return layout({
+    site,
+    prefix,
+    pageKey: '',
+    title: mod.name,
+    description: mod.desc || `${mod.name} 模块的全部文章`,
+    content,
+    moduleNav,
+    activeModule: mod.key,
+  });
 }
 
 /** 单个月份的列表页：pages/2026-08.html */
-export function renderMonthPage({ site, prefix = '', month, posts, older, newer }) {
+export function renderMonthPage({ site, prefix = '', month, posts, older, newer, moduleNav }) {
   const navParts = [];
   if (newer) navParts.push(`<a class="monthnav-item next" href="${prefix}${newer.url}"><span>更新的一个月</span><strong>${escapeHtml(newer.label)}</strong></a>`);
   if (older) navParts.push(`<a class="monthnav-item prev" href="${prefix}${older.url}"><span>更早的一个月</span><strong>${escapeHtml(older.label)}</strong></a>`);
@@ -327,10 +457,10 @@ ${
 }
 <p class="page-foot"><a class="back-home" href="${prefix}archive.html">← 全部归档</a></p>`;
 
-  return layout({ site, prefix, pageKey: 'archive', title: month.label, content });
+  return layout({ site, prefix, pageKey: 'archive', title: month.label, content, moduleNav });
 }
 
-export function renderTags({ site, prefix = '', tagCloud }) {
+export function renderTags({ site, prefix = '', tagCloud, moduleNav }) {
   const content = `<header class="page-header">
   <h1 class="page-title">标签</h1>
   <p class="page-lead">共 ${tagCloud.length} 个标签，点击查看相关文章。</p>
@@ -346,10 +476,10 @@ export function renderTags({ site, prefix = '', tagCloud }) {
     .join('\n  ')}
 </div>`;
 
-  return layout({ site, prefix, pageKey: 'tags', title: '标签', content });
+  return layout({ site, prefix, pageKey: 'tags', title: '标签', content, moduleNav });
 }
 
-export function renderTagPage({ site, prefix = '', tag, posts }) {
+export function renderTagPage({ site, prefix = '', tag, posts, moduleNav }) {
   const content = `<header class="page-header">
   <p class="page-eyebrow">标签</p>
   <h1 class="page-title">${escapeHtml(tag.name)}</h1>
@@ -358,10 +488,10 @@ export function renderTagPage({ site, prefix = '', tag, posts }) {
 ${postList([{ key: `tag-${tag.slug}`, posts }], prefix)}
 <p class="page-foot"><a class="back-home" href="${prefix}tags/index.html">← 全部标签</a></p>`;
 
-  return layout({ site, prefix, pageKey: 'tags', title: `标签：${tag.name}`, content });
+  return layout({ site, prefix, pageKey: 'tags', title: `标签：${tag.name}`, content, moduleNav });
 }
 
-export function renderPage({ site, prefix = '', pageKey = 'about', title, description, html, headings = [] }) {
+export function renderPage({ site, prefix = '', pageKey = 'about', title, description, html, headings = [], moduleNav }) {
   const toc = headings.length
     ? `<aside class="toc" aria-label="目录">
   <p class="toc-title">目录</p>
@@ -384,17 +514,17 @@ ${html}
   ${toc}
 </div>`;
 
-  return layout({ site, prefix, pageKey, title, description, content });
+  return layout({ site, prefix, pageKey, title, description, content, moduleNav });
 }
 
-export function render404({ site, prefix = '' }) {
+export function render404({ site, prefix = '', moduleNav }) {
   const content = `<section class="notfound">
   <p class="notfound-code">404</p>
   <h1 class="page-title">这一页大概是走丢了</h1>
   <p class="page-lead">链接可能已经改了名字，或者从来没有存在过。</p>
   <p><a class="back-home" href="${prefix}index.html">← 回到首页</a></p>
 </section>`;
-  return layout({ site, prefix, title: '页面未找到', content });
+  return layout({ site, prefix, title: '页面未找到', content, moduleNav });
 }
 
 /* ------------------------------------------------------------------ */

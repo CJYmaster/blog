@@ -2,3 +2,7 @@ node_modules/
 dist/
 .DS_Store
 *.log
+
+# Obsidian 的工作区缓存（.md 笔记本身照常提交）
+.obsidian/
+.trash/

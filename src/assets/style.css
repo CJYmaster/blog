@@ -1,5 +1,5 @@
 /* ==================================================================
-   苔痕集 · 样式表
+   凝痕 · 样式表
    浅卡其纸底 + 淡绿点缀，宁可少一点，也不要吵。
    ================================================================== */
 
@@ -92,6 +92,138 @@ a {
   padding: 0 24px;
 }
 
+/* 宽版容器：页头、页脚和带左侧栏的页面整体用它对齐 */
+.wrap-wide {
+  width: 100%;
+  max-width: var(--wrap-wide);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/*
+   左侧栏 + 正文的两栏外壳。
+   没配模块时（sidebar 为空）自动退化成单栏，不影响原有页面。
+*/
+.shell {
+  display: block;
+}
+
+.shell.has-sidebar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  max-width: var(--wrap-wide);
+  margin: 0 auto;
+}
+
+.shell.has-sidebar > .wrap {
+  padding: 0 24px;
+}
+
+/* ---------- 左侧栏：内容模块 ---------- */
+
+.sidebar {
+  display: none; /* 窄屏隐藏，靠页面顶部的模块导航代替 */
+}
+
+.sidebar-title {
+  margin: 0 0 12px;
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.mod-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.mod-list li + li {
+  margin-top: 2px;
+}
+
+.mod-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  color: var(--ink-2);
+  font-size: 0.94rem;
+  line-height: 1.5;
+  transition: background-color 0.18s, color 0.18s;
+}
+
+.mod-link:hover {
+  background: var(--moss-wash);
+  color: var(--moss-deep);
+}
+
+.mod-link.is-active {
+  background: var(--moss-wash);
+  color: var(--moss-deep);
+  font-weight: 600;
+}
+
+.mod-count {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ink-3);
+}
+
+.mod-link.is-active .mod-count {
+  color: var(--moss);
+}
+
+/* 模块页上方的小分类 chips 与月份 chips 共用 .chip 样式 */
+.sub-chips {
+  margin: 0;
+}
+
+/* 首页/模块页顶部的模块导航（窄屏可见） */
+.mod-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 26px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.mod-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 15px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink-2);
+  font-size: 0.88rem;
+  transition: all 0.18s;
+}
+
+.mod-tab:hover {
+  border-color: var(--moss-soft);
+  color: var(--moss-deep);
+  background: var(--moss-wash);
+}
+
+.mod-tab.is-active {
+  background: var(--moss);
+  border-color: var(--moss);
+  color: #fff;
+}
+
+.mod-tab i {
+  font-style: normal;
+  font-size: 0.72rem;
+  opacity: 0.7;
+}
+
 .skip-link {
   position: absolute;
   left: -9999px;
@@ -162,21 +294,23 @@ a {
 .brand-text {
   display: flex;
   flex-direction: column;
-  line-height: 1.25;
+  gap: 1px;
+  line-height: 1.3;
 }
 
 .brand-text strong {
   font-family: var(--font-serif);
   font-size: 1.14rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.14em;
 }
 
 .brand-text em {
   font-style: normal;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: var(--ink-3);
-  letter-spacing: 0.14em;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
 }
 
 .site-nav {
@@ -1283,12 +1417,12 @@ a {
   }
 }
 
-/* ---------- 宽屏：文章页右侧放目录 ---------- */
+/* ---------- 宽屏：左侧模块栏 + 文章页右侧目录 ---------- */
 
 @media (min-width: 1080px) {
   /* 页头页脚在所有页面上保持同一宽度，翻页时导航不会左右跳 */
-  .site-header .wrap,
-  .site-footer .wrap {
+  .site-header .wrap-wide,
+  .site-footer .wrap-wide {
     max-width: var(--wrap-wide);
   }
   .post-layout {
@@ -1303,6 +1437,35 @@ a {
   /* 只有文章页需要把主容器放宽，好给目录腾地方 */
   body.is-post .wrap {
     max-width: var(--wrap-wide);
+  }
+
+  /* ---- 左侧模块栏：竖排固定在左边 ---- */
+  .shell.has-sidebar {
+    grid-template-columns: 172px minmax(0, 1fr);
+    gap: 44px;
+    align-items: start;
+  }
+  .sidebar {
+    display: block;
+    position: sticky;
+    top: 92px;
+    align-self: start;
+    max-height: calc(100vh - 130px);
+    overflow-y: auto;
+    padding-top: 60px;
+  }
+  /* 宽屏下左侧栏已经承担模块导航，页面顶部的模块 tabs 就收起来 */
+  .mod-tabs {
+    display: none;
+  }
+  /* 有左侧栏时，正文不再额外居中，避免双重留白 */
+  .shell.has-sidebar > .wrap {
+    max-width: none;
+    padding: 0;
+  }
+  .shell.has-sidebar .page-header,
+  .shell.has-sidebar .section {
+    padding-left: 0;
   }
 }
 

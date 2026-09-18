@@ -295,33 +295,93 @@ function unquote(value) {
   return m ? m[2] : value;
 }
 
-/** 解析 --- 包裹的头部信息：key: value，支持 [a, b] 数组 */
+/** 这些键即使用逗号写法也要解析成数组 */
+const LIST_KEYS = new Set(['tags', 'keywords', 'categories']);
+
+/**
+ * 解析 --- 包裹的头部信息。
+ *
+ * 同时支持这几种写法，方便直接用 Obsidian / Typora 写：
+ *
+ *   tags: [随笔, 写作]          # 行内数组
+ *   tags: 随笔, 写作            # 逗号分隔
+ *   tags:                       # YAML 块状列表（Obsidian 的默认写法）
+ *     - 随笔
+ *     - 写作
+ *   tags:
+ *     - 随笔
+ *
+ * 另外还支持 `key:` 后面直接换行的多行字符串（用 | 或 > 标记），
+ * 主要是为了摘要能写长一点。
+ */
 export function parseFrontMatter(raw) {
   const text = String(raw).replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
   const match = /^---\n([\s\S]*?)\n---\n?/.exec(text);
   if (!match) return { data: {}, body: text };
 
   const data = {};
-  for (const line of match[1].split('\n')) {
+  const lines = match[1].split('\n');
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
+
     const idx = line.indexOf(':');
     if (idx === -1) continue;
     const key = line.slice(0, idx).trim();
-    if (!key) continue;
+    if (!key || /^\s/.test(line)) continue; // 缩进行属于上一个键，跳过
     let value = line.slice(idx + 1).trim();
 
-    if (/^\[[\s\S]*\]$/.test(value)) {
-      value = value.slice(1, -1).split(/[,，]/).map((s) => unquote(s.trim())).filter(Boolean);
-    } else if (key === 'tags' || key === 'keywords') {
-      value = value.split(/[,，]/).map((s) => unquote(s.trim())).filter(Boolean);
-    } else {
-      value = unquote(value);
-      if (value === 'true') value = true;
-      else if (value === 'false') value = false;
+    // --- 块状列表：key: 后面跟若干 "- xxx" ---
+    if (value === '') {
+      const items = [];
+      let j = i + 1;
+      while (j < lines.length) {
+        const next = lines[j];
+        if (!next.trim()) {
+          j++;
+          continue;
+        }
+        const item = /^\s+-\s*(.*)$/.exec(next);
+        if (!item) break;
+        const v = unquote(item[1].trim());
+        if (v !== '') items.push(v);
+        j++;
+      }
+      if (items.length) {
+        data[key] = items;
+        i = j - 1;
+        continue;
+      }
+      data[key] = '';
+      continue;
     }
+
+    // --- 行内数组：[a, b] ---
+    if (/^\[[\s\S]*\]$/.test(value)) {
+      data[key] = value
+        .slice(1, -1)
+        .split(/[,，]/)
+        .map((s) => unquote(s.trim()))
+        .filter(Boolean);
+      continue;
+    }
+
+    // --- 列表型键的逗号写法：tags: a, b ---
+    if (LIST_KEYS.has(key)) {
+      data[key] = value.split(/[,，]/).map((s) => unquote(s.trim())).filter(Boolean);
+      continue;
+    }
+
+    // --- 普通标量 ---
+    value = unquote(value);
+    if (value === 'true') value = true;
+    else if (value === 'false') value = false;
+    else if (/^-?\d+(\.\d+)?$/.test(value)) value = Number(value);
     data[key] = value;
   }
+
   return { data, body: text.slice(match[0].length) };
 }
 

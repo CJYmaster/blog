@@ -1,6 +1,8 @@
 ---
 title: 用两百行 Node.js 写一个静态博客生成器
 date: 2026-07-18
+module: web
+sub: 工程化
 tags: [Node.js, 工具, 教程]
 summary: 不装任何依赖，从零实现 front matter、Markdown 解析、列表嵌套和模板渲染。拆开来看，静态站点生成器没那么神秘。
 ---
