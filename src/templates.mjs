@@ -115,7 +115,7 @@ ${content}
 
 <footer class="site-footer">
   <div class="wrap-wide footer-inner">
-    <p>© ${copyright} ${escapeHtml(site.author)} · 用 Markdown 写作，用 200 行脚本生成</p>
+    <p>© ${copyright} ${escapeHtml(site.author)} · Markdown 写作，静态生成</p>
     <p class="footer-meta"><a href="${prefix}feed.xml">RSS</a>${site.footer.icp ? ` · <span>${escapeHtml(site.footer.icp)}</span>` : ''}</p>
   </div>
 </footer>
@@ -200,7 +200,7 @@ export function postCard(post, prefix = '') {
  */
 export function postList(blocks, prefix = '') {
   const list = blocks.filter((b) => b.posts?.length);
-  if (!list.length) return '<p class="empty">这里还什么都没有。</p>';
+  if (!list.length) return '<p class="empty">这里还没有文章。</p>';
 
   return `<div class="post-list">${list
     .map((block) => {
@@ -220,10 +220,11 @@ ${head ? `${head}\n` : ''}${cards}
 }
 
 export function hero({ site }) {
+  // lead 是可选的：不配就只显示标语与标题
+  const lead = site.hero.lead ? `\n  <p class="hero-lead">${escapeHtml(site.hero.lead)}</p>` : '';
   return `<section class="hero">
   <p class="hero-eyebrow">${escapeHtml(site.tagline)}</p>
-  <h1 class="hero-title">${escapeHtml(site.hero.title)}</h1>
-  <p class="hero-lead">${escapeHtml(site.hero.lead)}</p>
+  <h1 class="hero-title">${escapeHtml(site.hero.title)}</h1>${lead}
 </section>`;
 }
 
@@ -261,7 +262,7 @@ export function renderHome({ site, prefix = '', blocks, total, months, newestMon
 <section class="section" id="posts">
   ${moduleTabs(moduleNav, '')}
   <div class="section-head">
-    <h2 class="section-title">最近写下的</h2>
+    <h2 class="section-title">最新文章</h2>
     <span class="section-count">${total} 篇 · ${months.length} 个月</span>
   </div>
   ${toolbar}
