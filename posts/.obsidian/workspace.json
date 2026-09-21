@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "2026-09-14-first.md",
+                "file": "2026-09-19-DVWA.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "2026-09-14-first"
+              "title": "2026-09-19-DVWA"
             }
           }
         ]
@@ -188,12 +188,15 @@
       "bases:新建数据库": false
     }
   },
-  "active": "6c7dc156b7523d76",
+  "active": "a9691b2761ef9228",
   "lastOpenFiles": [
+    "图片",
+    "图片/DVWA_1.png",
+    "2026-07-18-modelmd.md",
+    "2026-09-19-DVWA.md",
     "2026-08-30-hello-moss.md",
     "2026-04-19-windows-dev-setup.md",
     "2026-06-05-reading-list.md",
-    "2026-07-18-static-blog-generator.md",
     "2026-09-14-first.md"
   ]
 }

@@ -57,7 +57,7 @@ function inline(text) {
     return `\u0000${codes.length - 1}\u0000`;
   });
 
-  // 图片
+  // 图片（标准语法）
   out = out.replace(
     /!\[([^\]]*)\]\(((?:[^()\s]|\([^()]*\))+)(?:\s+&quot;([^&]*)&quot;)?\)/g,
     (_m, alt, src, title) => {
@@ -65,6 +65,15 @@ function inline(text) {
       return `<img src="${safeUrl(src)}" alt="${alt}"${t} loading="lazy">`;
     },
   );
+
+  // 图片（Obsidian wiki 语法）：![[图片.png]] 或 ![[图片.png|说明]]
+  // 这里只负责产出 <img>，真正的路径解析与文件复制交给 build.mjs
+  out = out.replace(/!\[\[([^\]|]+?)(?:\|([^\]]*))?\]\]/g, (_m, target, label) => {
+    const file = target.trim();
+    const caption = (label ?? '').trim();
+    const alt = caption || file.replace(/\.[^.]+$/, '');
+    return `<img src="${safeUrl(file)}" alt="${alt}" loading="lazy">`;
+  });
 
   // 链接（URL 允许一层括号，例如 wiki 链接）
   out = out.replace(
@@ -189,13 +198,25 @@ function parseBlocks(lines, headings, seen) {
     // --- 列表 ---
     if (RE_LIST.test(line)) {
       const buf = [];
+      // 列表项的「内容起始列」：标记宽度 + 缩进 + 标记后的空格
+      // 只有缩进达到这一列的行才算续行，缩进不足的行另起段落，
+      // 否则「- 第一项」后面缩进一格的普通句子会被吞进同一项。
+      const firstMatch = RE_LIST.exec(line);
+      const contentCol = firstMatch[1].replace(/\t/g, '    ').length + firstMatch[2].length + 1;
+
+      const isContinuation = (text) => {
+        if (!/^\s+\S/.test(text)) return false;
+        const indent = text.match(/^\s*/)[0].replace(/\t/g, '    ').length;
+        return indent >= contentCol;
+      };
+
       while (i < n) {
         const cur = lines[i];
-        if (RE_LIST.test(cur) || /^\s+\S/.test(cur)) { buf.push(cur); i++; continue; }
+        if (RE_LIST.test(cur) || isContinuation(cur)) { buf.push(cur); i++; continue; }
         if (!cur.trim()) {
           let k = i + 1;
           while (k < n && !lines[k].trim()) k++;
-          if (k < n && (RE_LIST.test(lines[k]) || /^\s+\S/.test(lines[k]))) { buf.push(''); i++; continue; }
+          if (k < n && (RE_LIST.test(lines[k]) || isContinuation(lines[k]))) { buf.push(''); i++; continue; }
         }
         break;
       }

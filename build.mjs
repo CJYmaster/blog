@@ -66,6 +66,117 @@ async function writeOut(relative, contents) {
   return target;
 }
 
+/* ------------------------------------------------------------------ */
+/* 文章图片                                                            */
+/* ------------------------------------------------------------------ */
+
+const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.avif', '.bmp']);
+
+/**
+ * 递归扫描 posts/ 与 content/ 下的图片，建立「文件名 → 绝对路径」索引。
+ *
+ * 这样文章里无论写 `![[DVWA_1.png]]`（Obsidian wiki 语法）
+ * 还是 `![](图片/DVWA_1.png)`（标准语法），都能找到同一个文件，
+ * 不必关心图片实际放在哪个子目录里。
+ */
+async function scanImages() {
+  const byName = new Map(); // 文件名（小写）→ 绝对路径
+  const byRel = new Map(); // 相对 posts/ 的路径（小写）→ 绝对路径
+
+  async function walk(dir, base = dir) {
+    let entries = [];
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.name.startsWith('.')) continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(full, base);
+        continue;
+      }
+      if (!IMAGE_EXT.has(path.extname(entry.name).toLowerCase())) continue;
+
+      const rel = path.relative(base, full).split(path.sep).join('/');
+      byRel.set(rel.toLowerCase(), full);
+      byName.set(entry.name.toLowerCase(), full);
+      // 同名文件以先出现的为准，冲突时给出提示
+      if (byName.has(entry.name.toLowerCase()) && byName.get(entry.name.toLowerCase()) !== full) {
+        byName.set(entry.name.toLowerCase(), full);
+      }
+    }
+  }
+
+  await walk(POSTS_DIR);
+  await walk(PAGES_DIR);
+  return { byName, byRel };
+}
+
+/**
+ * 把文章里引用的图片挑出来并复制到 dist/images/。
+ *
+ * 支持两种写法：
+ *   ![[DVWA_1.png]]            按文件名在全库找
+ *   ![说明](图片/DVWA_1.png)   相对 posts/ 的路径
+ * 外链（http/https）原样保留，不复制。
+ */
+async function collectAndCopyImages(posts, warnings) {
+  const { byName, byRel } = await scanImages();
+  const refRe = /!\[\[([^\]|]+?)(?:\|[^\]]*)?\]\]|!\[[^\]]*\]\(([^)\s]+)\)/g;
+  const copied = new Map(); // 源绝对路径 → dist 内的相对路径
+  let missing = 0;
+
+  await mkdir(path.join(OUT_DIR, 'images'), { recursive: true });
+
+  for (const post of posts) {
+    const refs = [];
+    let m;
+    refRe.lastIndex = 0;
+    while ((m = refRe.exec(post.body)) !== null) refs.push((m[1] ?? m[2] ?? '').trim());
+
+    for (const raw of refs) {
+      if (!raw || /^(https?:)?\/\//i.test(raw) || raw.startsWith('data:')) continue;
+
+      const cleaned = decodeURIComponent(raw).replace(/^\.\//, '');
+      const key = cleaned.toLowerCase();
+      const file = byRel.get(key) ?? byName.get(path.basename(key));
+
+      if (!file) {
+        warnings.push(`${post.file}.md 引用的图片找不到：${raw}`);
+        missing++;
+        continue;
+      }
+      if (copied.has(file)) continue;
+
+      // 用原名放进 dist/images/，重名时加短哈希前缀避免互相覆盖
+      let name = path.basename(file);
+      const taken = new Set([...copied.values()].map((p) => path.basename(p)));
+      if (taken.has(name)) {
+        const stem = path.basename(name, path.extname(name));
+        name = `${stem}-${Buffer.from(file).toString('hex').slice(0, 4)}${path.extname(name)}`;
+      }
+      const dest = path.join(OUT_DIR, 'images', name);
+      await copyFile(file, dest);
+      copied.set(file, `images/${name}`);
+    }
+  }
+
+  return { copied, missing };
+}
+
+/** 把渲染结果里的图片地址改写成 dist 内的真实路径 */
+function rewriteImageSrc(html, copied) {
+  const byName = new Map([...copied.keys()].map((abs) => [path.basename(abs).toLowerCase(), copied.get(abs)]));
+  return html.replace(/<img src="([^"]+)"/g, (whole, src) => {
+    if (/^(https?:)?\/\//i.test(src) || src.startsWith('data:')) return whole;
+    const key = decodeURIComponent(src).replace(/^\.\//, '');
+    const hit = byName.get(path.basename(key).toLowerCase());
+    return hit ? `<img src="../${hit}"` : whole;
+  });
+}
+
 /** 中文按字计、英文按词计，取一个粗糙但够用的阅读时长 */
 function readingMinutes(plainText) {
   const cjk = (plainText.match(/[\u3400-\u4dbf\u4e00-\u9fff]/g) || []).length;
@@ -340,6 +451,12 @@ export async function build() {
 
   // --- 按月分组：posts 已按日期倒序，所以 months 天然是从新到旧 ---
   const months = groupByMonth(posts);
+
+  // --- 文章图片：复制进 dist/images/ 并把正文里的地址改成真实路径 ---
+  const { copied: imageMap, missing: missingImages } = await collectAndCopyImages(posts, warnings);
+  if (imageMap.size) {
+    for (const post of posts) post.html = rewriteImageSrc(post.html, imageMap);
+  }
 
   // --- 首页：按月分块，超出上限的旧月份折叠成「更早的文章」 ---
   const monthsOnHome = Number(site.postsOnHome) || 0;
