@@ -122,6 +122,20 @@ async function scanImages() {
  *   ![说明](图片/DVWA_1.png)   相对 posts/ 的路径
  * 外链（http/https）原样保留，不复制。
  */
+/**
+ * 剥掉围栏代码块与行内代码。
+ *
+ * 代码块里出现的 ![](x.png) 通常是「如何写图片」的示例文本，
+ * 不是真的要引用那个文件，所以扫描图片前必须先剔除，
+ * 否则样例文章会不断报「图片找不到」。
+ */
+function stripCode(markdown) {
+  return String(markdown)
+    .replace(/^```[\s\S]*?^```/gm, '')
+    .replace(/^~~~[\s\S]*?^~~~/gm, '')
+    .replace(/`[^`\n]*`/g, '');
+}
+
 async function collectAndCopyImages(posts, warnings) {
   const { byName, byRel } = await scanImages();
   const refRe = /!\[\[([^\]|]+?)(?:\|[^\]]*)?\]\]|!\[[^\]]*\]\(([^)\s]+)\)/g;
@@ -134,7 +148,8 @@ async function collectAndCopyImages(posts, warnings) {
     const refs = [];
     let m;
     refRe.lastIndex = 0;
-    while ((m = refRe.exec(post.body)) !== null) refs.push((m[1] ?? m[2] ?? '').trim());
+    const scannable = stripCode(post.body);
+    while ((m = refRe.exec(scannable)) !== null) refs.push((m[1] ?? m[2] ?? '').trim());
 
     for (const raw of refs) {
       if (!raw || /^(https?:)?\/\//i.test(raw) || raw.startsWith('data:')) continue;

@@ -99,7 +99,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "2026-09-14-first.md",
+                "file": "2026-09-19-DVWA.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -188,8 +188,10 @@
       "bases:新建数据库": false
     }
   },
-  "active": "a9691b2761ef9228",
+  "active": "6c7dc156b7523d76",
   "lastOpenFiles": [
+    "图片/DVWA_Brute_Force_2.png",
+    "图片/DVWA_Brute_Force_1.png",
     "图片",
     "图片/DVWA_1.png",
     "2026-07-18-modelmd.md",

@@ -1,9 +1,10 @@
 /**
- * 极简 Markdown 解析器（零依赖，约 200 行）
+ * 极简 Markdown 解析器（零依赖）
  *
  * 支持：标题、段落、粗体 / 斜体 / 删除线、行内代码、围栏代码块、
  *      有序与无序列表（可嵌套）、引用、表格、分割线、链接、图片、硬换行。
- * 不支持：HTML 内联、脚注、数学公式、任务列表（够用就好）。
+ * 图片支持标准语法 `![](a.png)` 与 Obsidian 的 `![[a.png]]`。
+ * 不支持：内联 HTML、脚注、数学公式、任务列表（够用就好）。
  */
 
 const ESCAPE_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -75,7 +76,7 @@ function inline(text) {
     return `<img src="${safeUrl(file)}" alt="${alt}" loading="lazy">`;
   });
 
-  // 链接（URL 允许一层括号，例如 wiki 链接）
+  // 链接（URL 允许一层括号）
   out = out.replace(
     /\[([^\]]+)\]\(((?:[^()\s]|\([^()]*\))+)(?:\s+&quot;([^&]*)&quot;)?\)/g,
     (_m, label, href, title) => {
@@ -86,12 +87,18 @@ function inline(text) {
     },
   );
 
-  // 加粗 / 斜体 / 删除线
-  out = out.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
-  out = out.replace(/__([^_\n]+)__/g, '<strong>$1</strong>');
+  // 删除线
   out = out.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
-  out = out.replace(/(^|[^*\w])\*([^*\n]+)\*/g, '$1<em>$2</em>');
-  out = out.replace(/(^|[^_\w])_([^_\n]+)_/g, '$1<em>$2</em>');
+
+  // 加粗与斜体：按「标记从长到短」处理，避免 *** 被拆错。
+  // 斜体两侧不能紧贴拉丁字母/数字，保护 a*b、snake_case 这类写法；
+  // 汉字不算词字符，所以 *中文斜体* 照常生效。
+  out = out.replace(/\*\*\*([^*\n]+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+  out = out.replace(/___([^_\n]+?)___/g, '<strong><em>$1</em></strong>');
+  out = out.replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>');
+  out = out.replace(/__([^_\n]+?)__/g, '<strong>$1</strong>');
+  out = out.replace(/(?<![A-Za-z0-9*])\*([^*\n]+?)\*(?![A-Za-z0-9*])/g, '<em>$1</em>');
+  out = out.replace(/(?<![A-Za-z0-9_])_([^_\n]+?)_(?![A-Za-z0-9_])/g, '<em>$1</em>');
 
   // 行尾两个空格 = 硬换行
   out = out.replace(/ {2,}\n/g, '<br>\n');
@@ -198,8 +205,8 @@ function parseBlocks(lines, headings, seen) {
     // --- 列表 ---
     if (RE_LIST.test(line)) {
       const buf = [];
-      // 列表项的「内容起始列」：标记宽度 + 缩进 + 标记后的空格
-      // 只有缩进达到这一列的行才算续行，缩进不足的行另起段落，
+      // 列表项的「内容起始列」：缩进 + 标记宽度 + 标记后的空格。
+      // 只有缩进达到这一列的行才算续行；缩进不足的行另起段落，
       // 否则「- 第一项」后面缩进一格的普通句子会被吞进同一项。
       const firstMatch = RE_LIST.exec(line);
       const contentCol = firstMatch[1].replace(/\t/g, '    ').length + firstMatch[2].length + 1;
@@ -329,11 +336,6 @@ const LIST_KEYS = new Set(['tags', 'keywords', 'categories']);
  *   tags:                       # YAML 块状列表（Obsidian 的默认写法）
  *     - 随笔
  *     - 写作
- *   tags:
- *     - 随笔
- *
- * 另外还支持 `key:` 后面直接换行的多行字符串（用 | 或 > 标记），
- * 主要是为了摘要能写长一点。
  */
 export function parseFrontMatter(raw) {
   const text = String(raw).replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
@@ -347,11 +349,13 @@ export function parseFrontMatter(raw) {
     const line = lines[i];
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
+    // 缩进行属于上一个键的块状列表，跳过
+    if (/^\s/.test(line)) continue;
 
     const idx = line.indexOf(':');
     if (idx === -1) continue;
     const key = line.slice(0, idx).trim();
-    if (!key || /^\s/.test(line)) continue; // 缩进行属于上一个键，跳过
+    if (!key) continue;
     let value = line.slice(idx + 1).trim();
 
     // --- 块状列表：key: 后面跟若干 "- xxx" ---
@@ -361,8 +365,11 @@ export function parseFrontMatter(raw) {
       while (j < lines.length) {
         const next = lines[j];
         if (!next.trim()) {
-          j++;
-          continue;
+          // 空行之后若仍是列表项就继续，否则结束
+          let k = j + 1;
+          while (k < lines.length && !lines[k].trim()) k++;
+          if (k < lines.length && /^\s+-\s*/.test(lines[k])) { j = k; continue; }
+          break;
         }
         const item = /^\s+-\s*(.*)$/.exec(next);
         if (!item) break;
@@ -370,12 +377,8 @@ export function parseFrontMatter(raw) {
         if (v !== '') items.push(v);
         j++;
       }
-      if (items.length) {
-        data[key] = items;
-        i = j - 1;
-        continue;
-      }
-      data[key] = '';
+      data[key] = items.length ? items : '';
+      i = j - 1;
       continue;
     }
 
@@ -420,6 +423,7 @@ export function toPlainText(markdown) {
   return String(markdown)
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/^\s*#{1,6}\s+/gm, '')
+    .replace(/!\[\[[^\]]*\]\]/g, ' ')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/^[>\s]*/gm, '')
