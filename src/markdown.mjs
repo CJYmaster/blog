@@ -100,8 +100,11 @@ function inline(text) {
   out = out.replace(/(?<![A-Za-z0-9*])\*([^*\n]+?)\*(?![A-Za-z0-9*])/g, '<em>$1</em>');
   out = out.replace(/(?<![A-Za-z0-9_])_([^_\n]+?)_(?![A-Za-z0-9_])/g, '<em>$1</em>');
 
-  // 行尾两个空格 = 硬换行
-  out = out.replace(/ {2,}\n/g, '<br>\n');
+  // 单个换行 = 一个 <br>
+  //
+  // 采用「所见即所得」：源码里怎么换行，页面上就怎么显示，
+  // 与 Obsidian 等笔记软件的习惯一致，不必在行尾敲两个空格。
+  out = out.replace(/[ \t]*\n/g, '<br>\n');
 
   // 还原行内代码
   out = out.replace(/\u0000(\d+)\u0000/g, (_m, i) => codes[Number(i)]);
@@ -275,9 +278,9 @@ function renderList(buf) {
       }
       items.push({ level: idx, ordered: /\d/.test(m[2]), text: m[3].trim() });
     } else if (items.length) {
-      // 续行：并到上一条，普通换行视作空格
+      // 续行：并到上一条。用换行连接，让它在页面上也换行显示
       const extra = raw.trim();
-      if (extra) items[items.length - 1].text += ` ${extra}`;
+      if (extra) items[items.length - 1].text += `\n${extra}`;
     }
   }
   if (!items.length) return '';

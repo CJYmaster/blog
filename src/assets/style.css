@@ -24,8 +24,8 @@
   --radius-sm: 9px;
   --shadow-sm: 0 1px 2px rgba(76, 106, 72, 0.05);
   --shadow-md: 0 1px 2px rgba(76, 106, 72, 0.05), 0 14px 30px -18px rgba(76, 106, 72, 0.35);
-  --wrap: 760px;
-  --wrap-wide: 1080px;
+  --wrap: 900px; /* 单栏时的正文宽度 */
+  --wrap-wide: 1320px; /* 宽屏外壳：左侧栏(172) + 正文/列表(约 1050) */
 
   --font-sans: "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", -apple-system,
     BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
@@ -92,31 +92,24 @@ a {
   padding: 0 24px;
 }
 
-/* 宽版容器：页头、页脚和带左侧栏的页面整体用它对齐 */
+/* 宽版容器：页头、页脚用。
+   默认与正文同宽（保证页头和正文左边缘对齐），
+   到了宽屏再放到 --wrap-wide，容纳左侧栏。 */
 .wrap-wide {
   width: 100%;
-  max-width: var(--wrap-wide);
+  max-width: var(--wrap);
   margin: 0 auto;
   padding: 0 24px;
 }
 
 /*
-   左侧栏 + 正文的两栏外壳。
-   没配模块时（sidebar 为空）自动退化成单栏，不影响原有页面。
+   左侧栏 + 正文的外壳。
+   窄屏时就是一个普通块，正文交给内部的 .wrap 自己控制宽度与居中；
+   只有到宽屏（见文件末尾的媒体查询）才变成「左侧栏 + 正文」的两栏网格。
+   没配模块时 sidebar 为空，布局自然退化成单栏。
 */
 .shell {
   display: block;
-}
-
-.shell.has-sidebar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  max-width: var(--wrap-wide);
-  margin: 0 auto;
-}
-
-.shell.has-sidebar > .wrap {
-  padding: 0 24px;
 }
 
 /* ---------- 左侧栏：内容模块 ---------- */
@@ -1419,31 +1412,26 @@ a {
 
 /* ---------- 宽屏：左侧模块栏 + 文章页右侧目录 ---------- */
 
-@media (min-width: 1080px) {
-  /* 页头页脚在所有页面上保持同一宽度，翻页时导航不会左右跳 */
+/*
+   1280px 以下用单栏（正文 900px 居中，没有侧边栏和目录），
+   1280px 以上才铺开成「左侧栏 + 正文 + 目录」，这样每一栏都有足够宽度。
+*/
+@media (min-width: 1280px) {
+  /* 页头页脚加宽，与下面的外壳保持一致，翻页时导航不会左右跳 */
   .site-header .wrap-wide,
   .site-footer .wrap-wide {
-    max-width: var(--wrap-wide);
-  }
-  .post-layout {
-    grid-template-columns: minmax(0, 1fr) 210px;
-    gap: 48px;
-    max-width: var(--wrap-wide);
-    margin: 0 auto;
-  }
-  .toc {
-    display: block;
-  }
-  /* 只有文章页需要把主容器放宽，好给目录腾地方 */
-  body.is-post .wrap {
     max-width: var(--wrap-wide);
   }
 
   /* ---- 左侧模块栏：竖排固定在左边 ---- */
   .shell.has-sidebar {
+    display: grid;
     grid-template-columns: 172px minmax(0, 1fr);
     gap: 44px;
     align-items: start;
+    max-width: var(--wrap-wide);
+    margin: 0 auto;
+    padding: 0 24px; /* 与页头左右对齐 */
   }
   .sidebar {
     display: block;
@@ -1454,18 +1442,38 @@ a {
     overflow-y: auto;
     padding-top: 60px;
   }
-  /* 宽屏下左侧栏已经承担模块导航，页面顶部的模块 tabs 就收起来 */
-  .mod-tabs {
-    display: none;
-  }
   /* 有左侧栏时，正文不再额外居中，避免双重留白 */
   .shell.has-sidebar > .wrap {
     max-width: none;
+    margin: 0;
     padding: 0;
   }
   .shell.has-sidebar .page-header,
   .shell.has-sidebar .section {
     padding-left: 0;
+    /* 列表页限宽：卡片排太宽反而不好读 */
+    max-width: 900px;
+  }
+  /* 宽屏下左侧栏已经承担模块导航，页面顶部的模块 tabs 就收起来 */
+  .mod-tabs {
+    display: none;
+  }
+
+  /* ---- 文章页：正文 + 右侧目录 ----
+     正文列限宽 880px 保证行长舒适，目录占右侧 180px。 */
+  .post-layout {
+    grid-template-columns: minmax(0, 880px) 180px;
+    gap: 36px;
+    justify-content: start;
+    max-width: var(--wrap-wide);
+    margin: 0 auto;
+  }
+  .toc {
+    display: block;
+  }
+  /* 文章页没有左侧栏，主容器直接放到宽版 */
+  body.is-post .wrap {
+    max-width: var(--wrap-wide);
   }
 }
 
