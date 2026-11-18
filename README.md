@@ -1,7 +1,6 @@
 # 凝痕 · 极简个人博客
 
-一个**零依赖**的静态博客：文章用 Markdown 写，构建脚本（约 200 行 Node.js）把它们变成静态 HTML。
-没有框架、没有 `node_modules`、没有后台，只有纯文本和一点点卡其色配苔绿。
+一个零依赖的静态博客：文章用 Markdown 写
 
 ```
 posts/*.md  ──build.mjs──▶  dist/*.html  ──▶  任意静态托管
@@ -40,14 +39,14 @@ posts/2026-09-20-my-new-post.md
 ---
 title: 文章标题
 date: 2026-09-20
-module: web安全
-sub: 漏洞靶场
-tags: [靶场, 安全]
-summary: 一句话摘要，会显示在首页卡片和 RSS 里。
+module: test
+sub: test
+tags: test
+summary: 摘要，会显示在首页卡片和 RSS 里。
 draft: false
 ---
 
-正文从这里开始，正常写 Markdown 就行。
+正文从这里开始，正常写 Markdown就行 。
 ```
 
 头部字段说明：
