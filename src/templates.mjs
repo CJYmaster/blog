@@ -115,7 +115,7 @@ ${content}
 
 <footer class="site-footer">
   <div class="wrap-wide footer-inner">
-    <p>© ${copyright} ${escapeHtml(site.author)} · Markdown 写作，静态生成</p>
+    <p>© ${copyright} ${escapeHtml(site.author)} </p>
     <p class="footer-meta"><a href="${prefix}feed.xml">RSS</a>${site.footer.icp ? ` · <span>${escapeHtml(site.footer.icp)}</span>` : ''}</p>
   </div>
 </footer>
