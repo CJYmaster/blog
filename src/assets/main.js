@@ -24,10 +24,15 @@
     if (!input || !list) return;
 
     // 一个月 = 一个分组，分组里装着若干张卡片
+    // 置顶组是额外的一组：它的卡片各自带 data-month，月份筛选时按卡片本身的月份判断
     const groups = Array.from(list.querySelectorAll('.post-group')).map((el) => ({
       el,
       key: el.dataset.month || '',
-      label: el.querySelector('.month-head time')?.textContent?.trim() || '',
+      pinnedGroup: el.dataset.pinnedGroup === 'true',
+      label:
+        el.querySelector('.month-head time')?.textContent?.trim() ||
+        el.querySelector('.month-head .month-label')?.textContent?.trim() ||
+        '',
       cards: Array.from(el.querySelectorAll('.post-card')),
     }));
     if (!groups.length) return;
@@ -40,9 +45,14 @@
       let shown = 0;
 
       for (const group of groups) {
-        const monthHit = !activeMonth || group.key === activeMonth;
         let visibleInGroup = 0;
         for (const card of group.cards) {
+          // 置顶组里每个卡片按自己的月份判断；普通组按整组的月份判断
+          const monthHit = !activeMonth
+            ? true
+            : group.pinnedGroup
+              ? card.dataset.month === activeMonth
+              : group.key === activeMonth;
           const subHit = !activeSub || card.dataset.sub === activeSub;
           const hit = monthHit && subHit && (!q || card.textContent.toLowerCase().includes(q));
           card.hidden = !hit;

@@ -176,11 +176,15 @@ export function moduleTabs(moduleNav, prefix = '', activeKey = '') {
 export function postCard(post, prefix = '') {
   const tags = post.tags?.length ? ` data-tags="${escapeHtml(post.tags.map((t) => t.name).join(','))}"` : ' data-tags=""';
   const sub = post.sub ? ` data-sub="${escapeHtml(post.sub)}"` : ' data-sub=""';
-  return `<article class="post-card"${tags}${sub}>
+  // data-month 让「置顶」组里的卡片也能被月份筛选命中
+  const month = ` data-month="${escapeHtml(String(post.date).slice(0, 7))}"`;
+  const pinned = post.pinned ? ` data-pinned="true"` : '';
+  const badge = post.pinned ? '<span class="pin-badge">置顶</span>' : '';
+  return `<article class="post-card${post.pinned ? ' is-pinned' : ''}"${tags}${sub}${month}${pinned}>
   <a class="post-card-main" href="${prefix}${post.url}">
     <time class="post-card-date" datetime="${post.date}">${formatShort(post.date)}</time>
     <div class="post-card-body">
-      <h2 class="post-card-title">${escapeHtml(post.title)}</h2>
+      <h2 class="post-card-title">${badge}${escapeHtml(post.title)}</h2>
       <p class="post-card-summary">${escapeHtml(post.summary)}</p>
       <div class="post-card-meta">
         <span class="dot" aria-hidden="true"></span>
@@ -204,15 +208,20 @@ export function postList(blocks, prefix = '') {
 
   return `<div class="post-list">${list
     .map((block) => {
-      const head = block.heading
-        ? `<h3 class="month-head">
-      <time datetime="${block.heading.datetime}">${escapeHtml(block.heading.label)}</time>
-      <span>${block.posts.length} 篇</span>
+      // 置顶组没有日期，用「置顶」标签代替月份
+      let head = '';
+      if (block.heading) {
+        const title = block.heading.datetime
+          ? `<time datetime="${block.heading.datetime}">${escapeHtml(block.heading.label)}</time>`
+          : `<span class="month-label">${escapeHtml(block.heading.label)}</span>`;
+        head = `<h3 class="month-head${block.pinned ? ' is-pinned' : ''}">
+      ${title}
+      <span class="month-count">${block.posts.length} 篇</span>
       ${block.heading.href ? `<a class="month-permalink" href="${prefix}${block.heading.href}">单独打开</a>` : ''}
-    </h3>`
-        : '';
+    </h3>`;
+      }
       const cards = block.posts.map((p) => postCard(p, prefix)).join('\n');
-      return `  <div class="post-group" data-month="${block.key || ''}">
+      return `  <div class="post-group" data-month="${block.key || ''}"${block.pinned ? ' data-pinned-group="true"' : ''}>
 ${head ? `${head}\n` : ''}${cards}
   </div>`;
     })
@@ -232,7 +241,7 @@ export function hero({ site }) {
 /* 各个页面                                                            */
 /* ------------------------------------------------------------------ */
 
-export function renderHome({ site, prefix = '', blocks, total, months, newestMonth, olderLink, moduleNav }) {
+export function renderHome({ site, prefix = '', blocks, total, months, monthCount, newestMonth, olderLink, moduleNav }) {
   const monthChips = months.length
     ? `<div class="chips month-chips" id="month-chips">
     <button class="chip is-active" data-month="">全部</button>
@@ -263,7 +272,7 @@ export function renderHome({ site, prefix = '', blocks, total, months, newestMon
   ${moduleTabs(moduleNav, '')}
   <div class="section-head">
     <h2 class="section-title">最新文章</h2>
-    <span class="section-count">${total} 篇 · ${months.length} 个月</span>
+    <span class="section-count">${total} 篇 · ${monthCount ?? months.length} 个月</span>
   </div>
   ${toolbar}
   <div class="month-bar" id="month-bar" hidden>正在显示 <strong id="month-bar-label"></strong></div>
@@ -380,11 +389,19 @@ ${body}`;
  */
 export function renderModule({ site, prefix = '', mod, moduleNav, months }) {
   const total = mod.posts.length;
-  const blocks = months.map((m) => ({
-    key: m.key,
-    heading: { label: m.label, datetime: m.key, href: null },
-    posts: m.posts,
-  }));
+  // 置顶文章单独成组放在最前；月份分组已排除置顶文章，不会重复
+  const blocks = [
+    ...(mod.pinned?.length
+      ? [{ key: 'pinned', pinned: true, heading: { label: '置顶' }, posts: mod.pinned }]
+      : []),
+    ...months.map((m) => ({
+      key: m.key,
+      heading: { label: m.label, datetime: m.key, href: null },
+      posts: m.posts,
+    })),
+  ];
+  // 「N 个月」按模块内全部文章统计，含置顶文章所在的月份
+  const monthCount = new Set(mod.posts.map((p) => String(p.date).slice(0, 7))).size;
 
   const subChips = mod.subs.length
     ? `<div class="chips sub-chips" id="sub-chips">
@@ -399,7 +416,7 @@ export function renderModule({ site, prefix = '', mod, moduleNav, months }) {
   <p class="page-eyebrow">模块</p>
   <h1 class="page-title">${escapeHtml(mod.name)}</h1>
   ${mod.desc ? `<p class="page-lead">${escapeHtml(mod.desc)}</p>` : ''}
-  <p class="page-lead page-lead-sub">${total} 篇 · ${months.length} 个月${
+  <p class="page-lead page-lead-sub">${total} 篇 · ${monthCount} 个月${
     mod.subs.length ? ` · ${mod.subs.length} 个小分类` : ''
   }</p>
 </header>

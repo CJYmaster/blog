@@ -257,6 +257,8 @@ async function loadPosts() {
       tags,
       moduleName,
       subName,
+      // 置顶：pinned: true（也接受 top / sticky 两种写法）
+      pinned: data.pinned === true || data.top === true || data.sticky === true,
       draft: data.draft === true,
       minutes: readingMinutes(plain),
       html,
@@ -450,7 +452,9 @@ export async function build() {
   warnings.push(...warningList);
   for (const mod of modules) {
     mod.url = `modules/${mod.key}.html`;
-    mod.months = groupByMonth(mod.posts);
+    // 置顶文章单独成组放在最前，不再重复出现在月份分组里
+    mod.pinned = mod.posts.filter((p) => p.pinned);
+    mod.months = groupByMonth(mod.posts.filter((p) => !p.pinned));
   }
   // 没有文章的空模块不进左侧栏，避免点进去是空的
   const visibleModules = modules.filter((m) => m.posts.length > 0);
@@ -473,15 +477,31 @@ export async function build() {
     for (const post of posts) post.html = rewriteImageSrc(post.html, imageMap);
   }
 
-  // --- 首页：按月分块，超出上限的旧月份折叠成「更早的文章」 ---
+  // --- 首页：置顶文章单独成组，其余按月分块 ---
+  const pinnedPosts = posts.filter((p) => p.pinned);
+  // 首页的月份分组要排除置顶文章，否则同一篇会出现两次
+  const unpinnedMonths = groupByMonth(posts.filter((p) => !p.pinned));
+
   const monthsOnHome = Number(site.postsOnHome) || 0;
-  const homeMonths = monthsOnHome > 0 ? months.slice(0, monthsOnHome) : months;
-  const folded = monthsOnHome > 0 ? months.slice(monthsOnHome) : [];
-  const blocks = homeMonths.map((m) => ({
-    key: m.key,
-    heading: { label: m.label, datetime: m.key, href: m.url },
-    posts: m.posts,
-  }));
+  const homeMonths = monthsOnHome > 0 ? unpinnedMonths.slice(0, monthsOnHome) : unpinnedMonths;
+  const folded = monthsOnHome > 0 ? unpinnedMonths.slice(monthsOnHome) : [];
+
+  // 月份 chips 要覆盖「首页上真的看得到的月份」：
+  // 已展开的分组 + 置顶文章所属的月份（否则那个月点不到）。
+  const chipKeys = new Set(homeMonths.map((m) => m.key));
+  for (const post of pinnedPosts) chipKeys.add(String(post.date).slice(0, 7));
+  const chipMonths = months.filter((m) => chipKeys.has(m.key));
+
+  const blocks = [
+    ...(pinnedPosts.length
+      ? [{ key: 'pinned', pinned: true, heading: { label: '置顶' }, posts: pinnedPosts }]
+      : []),
+    ...homeMonths.map((m) => ({
+      key: m.key,
+      heading: { label: m.label, datetime: m.key, href: m.url },
+      posts: m.posts,
+    })),
+  ];
 
   await writeOut(
     'index.html',
@@ -490,7 +510,9 @@ export async function build() {
       prefix: '',
       blocks,
       total: posts.length,
-      months,
+      // chips 覆盖已展开的月份与置顶文章所属月份；总月数按全部文章算
+      months: chipMonths,
+      monthCount: months.length,
       newestMonth: months[0]?.key ?? '',
       moduleNav,
       olderLink: folded.length

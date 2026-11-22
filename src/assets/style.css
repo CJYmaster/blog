@@ -544,13 +544,31 @@ a {
   background: linear-gradient(90deg, var(--line), transparent);
 }
 
-.month-head > span {
+/* 篇数 */
+.month-head .month-count {
   order: 2;
   font-family: var(--font-sans);
   font-size: 0.74rem;
   font-weight: 400;
   letter-spacing: 0.1em;
   color: var(--ink-3);
+}
+
+/* 「置顶」这一组的标题：用主色区分，前面带一个小圆点 */
+.month-head .month-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--moss-deep);
+}
+
+.month-head .month-label::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--moss);
+  box-shadow: 0 0 0 3px var(--moss-wash);
 }
 
 .month-permalink {
@@ -667,6 +685,32 @@ a {
 
 .post-card:hover .post-card-title {
   color: var(--moss-deep);
+}
+
+/* 置顶徽标：标题前的小标签 */
+.pin-badge {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 8px;
+  border-radius: 6px;
+  background: var(--moss);
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  line-height: 1.6;
+  vertical-align: 0.18em;
+  white-space: nowrap;
+}
+
+/* 置顶卡片：左侧一道主色细线，和普通卡片区分开 */
+.post-card.is-pinned {
+  border-color: var(--moss-soft);
+}
+
+.post-card.is-pinned::before {
+  opacity: 1;
 }
 
 .post-card-summary {
